@@ -1269,6 +1269,7 @@ function openReservationModal() {
     const items = document.getElementById('reservation-items');
     const total = document.getElementById('reservation-total-amount');
     if (!modal || !overlay || !items || !total) return;
+    
     // Render resumen
     let html = '';
     cart.forEach(item => {
@@ -1280,6 +1281,7 @@ function openReservationModal() {
             </div>
         `;
     });
+    
     // Añadir información de descuento si aplica
     const computedSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     let computedDiscount = 0;
@@ -1296,6 +1298,7 @@ function openReservationModal() {
             </div>
         `;
     }
+    
     // Mostrar regalo incluido si lo hay
     const gifts = cart.filter(i => i.isGift === true);
     if (gifts.length > 0) {
@@ -1307,8 +1310,15 @@ function openReservationModal() {
             </div>
         `;
     }
+    
     items.innerHTML = html;
     total.textContent = `$${cartTotal.toLocaleString()} COP`;
+    
+    // Actualizar información de compatibilidad de WhatsApp
+    setTimeout(() => {
+        updateWhatsAppCompatibilityInfo();
+    }, 100);
+    
     modal.classList.add('show');
     overlay.classList.add('show');
 }
@@ -1457,24 +1467,143 @@ function submitReservation(event) {
     tryOpenWhatsApp(message);
 }
 
+// Función mejorada para detectar dispositivos móviles
+function isMobileDevice() {
+    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+    
+    // Detectar dispositivos móviles más específicamente
+    const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i;
+    const isMobile = mobileRegex.test(userAgent);
+    
+    // Detectar si es un dispositivo táctil
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Detectar tamaño de pantalla (para tablets en modo desktop)
+    const isSmallScreen = window.innerWidth <= 768;
+    
+    return isMobile || (isTouchDevice && isSmallScreen);
+}
+
 function tryOpenWhatsApp(message) {
     const whatsappNumber = '573116039256'; // +57 Colombia
     const encoded = encodeURIComponent(message);
-    const deepLink = `whatsapp://send?phone=${whatsappNumber}&text=${encoded}`;
+    
+    // Usar la función mejorada de detección móvil
+    const isMobile = isMobileDevice();
+    
+    let deepLink;
+    let fallbackLink;
+    
+    if (isMobile) {
+        // Para móviles, usar wa.me que es más confiable
+        deepLink = `https://wa.me/${whatsappNumber}?text=${encoded}`;
+        fallbackLink = `whatsapp://send?phone=${whatsappNumber}&text=${encoded}`;
+    } else {
+        // Para desktop, usar whatsapp:// primero
+        deepLink = `whatsapp://send?phone=${whatsappNumber}&text=${encoded}`;
+        fallbackLink = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encoded}`;
+    }
 
-    let visibilityChanged = false;
-    const onVisibility = () => { visibilityChanged = true; };
-    document.addEventListener('visibilitychange', onVisibility, { once: true });
-
-    const fallbackTimer = setTimeout(() => {
-        document.removeEventListener('visibilitychange', onVisibility, { once: true });
-        if (!visibilityChanged) {
+    // Mostrar notificación de carga
+    showNotification('Abriendo WhatsApp...');
+    
+    let appOpened = false;
+    let fallbackAttempted = false;
+    
+    const onVisibility = () => { 
+        appOpened = true;
+    };
+    
+    const onBlur = () => {
+        appOpened = true;
+    };
+    
+    const onFocus = () => {
+        // Si la ventana vuelve a tener foco después de un tiempo, probablemente la app no se abrió
+        if (!appOpened && !fallbackAttempted) {
+            setTimeout(() => {
+                if (!appOpened) {
+                    attemptFallback();
+                }
+            }, 1000);
+        }
+    };
+    
+    const attemptFallback = () => {
+        if (fallbackAttempted) return;
+        fallbackAttempted = true;
+        
+        console.log('Intentando con enlace de fallback...');
+        showNotification('Abriendo WhatsApp Web...');
+        
+        // Intentar con el enlace de fallback
+        try {
+            window.open(fallbackLink, '_blank');
+        } catch (error) {
+            console.error('Error al abrir fallback:', error);
             showNotification('No se pudo abrir WhatsApp. Asegúrate de tener la app instalada.');
         }
-    }, 1500);
+    };
+    
+    document.addEventListener('visibilitychange', onVisibility, { once: true });
+    window.addEventListener('blur', onBlur, { once: true });
+    window.addEventListener('focus', onFocus, { once: true });
+
+    // Timer principal para detectar si la app se abrió
+    const mainTimer = setTimeout(() => {
+        document.removeEventListener('visibilitychange', onVisibility, { once: true });
+        window.removeEventListener('blur', onBlur, { once: true });
+        window.removeEventListener('focus', onFocus, { once: true });
+        
+        if (!appOpened && !fallbackAttempted) {
+            attemptFallback();
+        }
+    }, 2000);
 
     // Intentar abrir la app de WhatsApp
-    window.location.href = deepLink;
+    try {
+        if (isMobile) {
+            // En móviles, intentar primero con wa.me
+            window.location.href = deepLink;
+        } else {
+            // En desktop, intentar primero con whatsapp://
+            window.location.href = deepLink;
+        }
+    } catch (error) {
+        console.error('Error al abrir WhatsApp:', error);
+        // Si hay error, usar el fallback inmediatamente
+        clearTimeout(mainTimer);
+        attemptFallback();
+    }
+}
+
+// Función para mostrar información de compatibilidad en tiempo real
+function updateWhatsAppCompatibilityInfo() {
+    const whatsappInfo = document.querySelector('.whatsapp-info');
+    if (!whatsappInfo) return;
+    
+    const isMobile = isMobileDevice();
+    const infoText = whatsappInfo.querySelector('small');
+    
+    if (isMobile) {
+        infoText.innerHTML = `
+            • <strong>Móviles:</strong> Se abrirá la app de WhatsApp directamente<br>
+            • <strong>Desktop:</strong> Se abrirá WhatsApp Web en tu navegador<br>
+            • <strong>Sin WhatsApp:</strong> Se mostrará un enlace alternativo
+        `;
+    } else {
+        infoText.innerHTML = `
+            • <strong>Desktop:</strong> Se abrirá WhatsApp Web en tu navegador<br>
+            • <strong>Móviles:</strong> Se abrirá la app de WhatsApp directamente<br>
+            • <strong>Sin WhatsApp:</strong> Se mostrará un enlace alternativo
+        `;
+    }
+}
+
+// Función para probar la funcionalidad de WhatsApp
+function testWhatsAppFunctionality() {
+    const testMessage = "Hola, esta es una prueba de la funcionalidad de WhatsApp desde Estilo Activo.";
+    tryOpenWhatsApp(testMessage);
 }
 
 // Mostrar modal de pago
