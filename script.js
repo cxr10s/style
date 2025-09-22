@@ -1366,41 +1366,88 @@ function validatePhone(phone) {
     return phoneRegex.test(phone);
 }
 
+// UI de errores de campo (móvil y desktop)
+function showFieldError(inputElement, message) {
+    if (!inputElement) return;
+    clearFieldError(inputElement);
+    const formGroup = inputElement.closest('.form-group') || inputElement.parentElement;
+    if (!formGroup) return;
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message show';
+    errorDiv.textContent = message;
+    // Insertar error antes del input para que quede encima del campo
+    formGroup.insertBefore(errorDiv, inputElement);
+    inputElement.classList.add('input-error');
+    // Asegurar visibilidad en móvil
+    try { inputElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+}
+
+function clearFieldError(inputElement) {
+    if (!inputElement) return;
+    const formGroup = inputElement.closest('.form-group') || inputElement.parentElement;
+    if (!formGroup) return;
+    const existing = formGroup.querySelector('.error-message');
+    if (existing) existing.remove();
+    inputElement.classList.remove('input-error');
+}
+
 function submitReservation(event) {
     event.preventDefault();
     if (cart.length === 0) {
         showNotification('Tu carrito está vacío');
         return;
     }
-    const firstName = document.getElementById('res-first-name').value.trim();
-    const lastName = document.getElementById('res-last-name').value.trim();
-    const phone = document.getElementById('res-phone').value.trim();
-    const email = document.getElementById('res-email').value.trim();
+    const firstNameInput = document.getElementById('res-first-name');
+    const lastNameInput = document.getElementById('res-last-name');
+    const phoneInput = document.getElementById('res-phone');
+    const emailInput = document.getElementById('res-email');
+    const firstName = firstNameInput ? firstNameInput.value.trim() : '';
+    const lastName = lastNameInput ? lastNameInput.value.trim() : '';
+    const phone = phoneInput ? phoneInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
     const paymentMethod = document.getElementById('res-payment-method').value;
     
-    // Validaciones estrictas
-    if (!firstName || !lastName || !phone || !email || !paymentMethod) {
-        showNotification('Por favor completa todos los campos');
+    // Limpiar errores anteriores
+    clearFieldError(firstNameInput);
+    clearFieldError(lastNameInput);
+    clearFieldError(phoneInput);
+    clearFieldError(emailInput);
+    
+    // Validaciones estrictas (con errores en campo)
+    if (!firstName) {
+        showFieldError(firstNameInput, 'Este campo es obligatorio.');
         return;
     }
     
     if (!validateName(firstName)) {
-        showNotification('El nombre solo puede contener letras (A-Z, a-z). No se permiten números, caracteres especiales ni tildes.');
+        showFieldError(firstNameInput, 'El nombre solo puede contener letras (A-Z, a-z).');
         return;
     }
     
+    if (!lastName) {
+        showFieldError(lastNameInput, 'Este campo es obligatorio.');
+        return;
+    }
     if (!validateName(lastName)) {
-        showNotification('El apellido solo puede contener letras (A-Z, a-z). No se permiten números, caracteres especiales ni tildes.');
+        showFieldError(lastNameInput, 'El apellido solo puede contener letras (A-Z, a-z).');
         return;
     }
     
+    if (!email) {
+        showFieldError(emailInput, 'Este campo es obligatorio.');
+        return;
+    }
     if (!validateEmail(email)) {
-        showNotification('Solo se aceptan correos que terminen en @gmail.com o @hotmail.com');
+        showFieldError(emailInput, 'Solo se aceptan correos que terminen en @gmail.com o @hotmail.com');
         return;
     }
     
+    if (!phone) {
+        showFieldError(phoneInput, 'Este campo es obligatorio.');
+        return;
+    }
     if (!validatePhone(phone)) {
-        showNotification('El número de teléfono debe contener exactamente 10 dígitos numéricos. No se permiten letras, espacios ni caracteres especiales.');
+        showFieldError(phoneInput, 'Debe contener exactamente 10 dígitos numéricos.');
         return;
     }
     
@@ -1816,9 +1863,11 @@ function resendVerificationCode() {
 
 // Funciones de pago
 async function processNequiPayment() {
-    const number = document.getElementById('nequi-number').value;
-    if (!number || number.length < 10) {
-        showNotification('Por favor ingresa un número de Nequi válido (10 dígitos)');
+    const nequiInput = document.getElementById('nequi-number');
+    const number = nequiInput ? nequiInput.value.trim() : '';
+    clearFieldError(nequiInput);
+    if (!validatePhone(number)) {
+        showFieldError(nequiInput, 'Número Nequi inválido: 10 dígitos numéricos.');
         return;
     }
     
@@ -1888,9 +1937,11 @@ async function processNequiPayment() {
 }
 
 async function processBancolombiaPayment() {
-    const number = document.getElementById('bancolombia-number').value;
-    if (!number || number.length < 10) {
-        showNotification('Por favor ingresa un número de Bancolombia válido (10 dígitos)');
+    const bancolombiaInput = document.getElementById('bancolombia-number');
+    const number = bancolombiaInput ? bancolombiaInput.value.trim() : '';
+    clearFieldError(bancolombiaInput);
+    if (!validatePhone(number)) {
+        showFieldError(bancolombiaInput, 'Número Bancolombia inválido: 10 dígitos numéricos.');
         return;
     }
     
