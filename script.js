@@ -1472,40 +1472,106 @@ function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(navigator.userAgent);
 }
 
+// Función principal para abrir WhatsApp con detección condicional
+function openWhatsApp(phone, message) {
+    const urlApp = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
+    const urlWeb = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+    
+    console.log('Intentando abrir WhatsApp con esquema nativo:', urlApp);
+    
+    // Variables para controlar el estado
+    let appOpened = false;
+    let timeoutId;
+    
+    // Función para limpiar recursos
+    const cleanup = () => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        window.removeEventListener('blur', onBlur);
+        window.removeEventListener('pagehide', onPageHide);
+    };
+    
+    // Función que se ejecuta cuando la app se abre exitosamente
+    const onAppOpen = () => {
+        if (!appOpened) {
+            appOpened = true;
+            console.log('WhatsApp app detectada y abierta');
+            cleanup();
+        }
+    };
+    
+    // Función que se ejecuta cuando la app no se abre
+    const onAppFail = () => {
+        if (!appOpened) {
+            console.log('WhatsApp app no detectada, redirigiendo a web');
+            window.location.href = urlWeb;
+            cleanup();
+        }
+    };
+    
+    // Event listeners para detectar si la app se abre
+    const onVisibilityChange = () => {
+        if (document.hidden || document.visibilityState === 'hidden') {
+            onAppOpen();
+        }
+    };
+    
+    const onBlur = () => {
+        onAppOpen();
+    };
+    
+    const onPageHide = () => {
+        onAppOpen();
+    };
+    
+    // Configurar event listeners
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('pagehide', onPageHide);
+    
+    // Intentar abrir la app usando window.location
+    try {
+        window.location.href = urlApp;
+    } catch (error) {
+        console.error('Error al intentar abrir WhatsApp app:', error);
+        onAppFail();
+        return;
+    }
+    
+    // Timeout de seguridad - si no se detecta apertura en 1.5 segundos, usar web
+    timeoutId = setTimeout(() => {
+        onAppFail();
+    }, 1500);
+    
+    // Timeout adicional para limpiar listeners
+    setTimeout(() => {
+        cleanup();
+    }, 3000);
+}
+
 function tryOpenWhatsApp(message) {
     const whatsappNumber = '573116039256'; // +57 Colombia
-    const encoded = encodeURIComponent(message);
     const isMobile = isMobileDevice();
     
     console.log('Dispositivo móvil detectado:', isMobile);
     console.log('User Agent:', navigator.userAgent);
     
-    let whatsappLink;
-    
-    if (isMobile) {
-        // Para móviles, usar SOLO wa.me (más confiable)
-        whatsappLink = `https://wa.me/${whatsappNumber}?text=${encoded}`;
-        console.log('Usando enlace móvil:', whatsappLink);
-    } else {
-        // Para desktop, usar whatsapp://
-        whatsappLink = `whatsapp://send?phone=${whatsappNumber}&text=${encoded}`;
-        console.log('Usando enlace desktop:', whatsappLink);
-    }
-
     // Mostrar notificación
     showNotification('Abriendo WhatsApp...');
     
-    // Intentar abrir WhatsApp de forma directa
     try {
         if (isMobile) {
-            // En móviles, usar window.location.href para redirección directa
-            window.location.href = whatsappLink;
+            // En móviles, usar la nueva función de detección condicional
+            openWhatsApp(whatsappNumber, message);
         } else {
-            // En desktop, también usar window.location.href
-            window.location.href = whatsappLink;
+            // En desktop, usar directamente la web
+            const urlWeb = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
+            console.log('Usando enlace web para desktop:', urlWeb);
+            window.location.href = urlWeb;
         }
         
-        // Si llegamos aquí, el enlace se ejecutó
         console.log('Enlace de WhatsApp ejecutado correctamente');
         
     } catch (error) {
@@ -1523,15 +1589,17 @@ function updateWhatsAppCompatibilityInfo() {
     
     if (isMobile) {
         infoText.innerHTML = `
-            • <strong>Móviles:</strong> Se abrirá la app de WhatsApp directamente<br>
-            • <strong>Formato:</strong> wa.me (compatible con todos los móviles)<br>
-            • <strong>Requisito:</strong> WhatsApp debe estar instalado
+            • <strong>Móviles:</strong> Detecta automáticamente si WhatsApp está instalado<br>
+            • <strong>Con app:</strong> Abre directamente la aplicación nativa<br>
+            • <strong>Sin app:</strong> Redirige a WhatsApp Web automáticamente<br>
+            • <strong>Compatible:</strong> Chrome, Safari, Firefox móvil
         `;
     } else {
         infoText.innerHTML = `
             • <strong>Desktop:</strong> Se abrirá WhatsApp Web en tu navegador<br>
-            • <strong>Formato:</strong> whatsapp:// (esquema nativo)<br>
-            • <strong>Fallback:</strong> WhatsApp Web si no funciona
+            • <strong>Formato:</strong> api.whatsapp.com (más confiable)<br>
+            • <strong>Ventaja:</strong> No requiere instalación de app<br>
+            • <strong>Compatible:</strong> Todos los navegadores modernos
         `;
     }
 }
@@ -1540,6 +1608,26 @@ function updateWhatsAppCompatibilityInfo() {
 function testWhatsAppFunctionality() {
     const testMessage = "Hola, esta es una prueba de la funcionalidad de WhatsApp desde Estilo Activo.";
     tryOpenWhatsApp(testMessage);
+}
+
+// Función para probar específicamente la detección condicional
+function testWhatsAppConditional() {
+    const testMessage = "🧪 Prueba de detección condicional de WhatsApp - Estilo Activo";
+    const whatsappNumber = '573116039256';
+    
+    console.log('=== PRUEBA DE DETECCIÓN CONDICIONAL ===');
+    console.log('Dispositivo móvil:', isMobileDevice());
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Mensaje de prueba:', testMessage);
+    
+    if (isMobileDevice()) {
+        console.log('Probando detección condicional en móvil...');
+        openWhatsApp(whatsappNumber, testMessage);
+    } else {
+        console.log('Dispositivo desktop - usando web directamente');
+        const urlWeb = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(testMessage)}`;
+        window.location.href = urlWeb;
+    }
 }
 
 // Función de debugging para verificar la detección móvil
