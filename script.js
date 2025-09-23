@@ -1589,16 +1589,13 @@ function updateWhatsAppCompatibilityInfo() {
     
     if (isMobile) {
         infoText.innerHTML = `
-            • <strong>Móviles:</strong> Detecta automáticamente si WhatsApp está instalado<br>
-            • <strong>Con app:</strong> Abre directamente la aplicación nativa<br>
-            • <strong>Sin app:</strong> Redirige a WhatsApp Web automáticamente<br>
-            • <strong>Compatible:</strong> Chrome, Safari, Firefox móvil
+            • <strong>Con app:</strong> Abre directamente la aplicación<br>
+            • <strong>Sin app:</strong> Se abrirá WhatsApp Web en el navegador<br>
+            • <strong>Compatible:</strong> Navegadores móviles modernos (Chrome, Safari, Firefox, Edge, Samsung Internet)
         `;
     } else {
         infoText.innerHTML = `
             • <strong>Desktop:</strong> Se abrirá WhatsApp Web en tu navegador<br>
-            • <strong>Formato:</strong> api.whatsapp.com (más confiable)<br>
-            • <strong>Ventaja:</strong> No requiere instalación de app<br>
             • <strong>Compatible:</strong> Todos los navegadores modernos
         `;
     }
